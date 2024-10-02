@@ -1,0 +1,42 @@
+version: '3.1'
+services:
+  odoo:
+    build: .
+    depends_on:
+      - mydb
+    environment:
+      - HOST=mydb
+      - USER=<db_user>
+      - PASSWORD=<db_password>
+    volumes:
+      - ./config:/etc/odoo
+      - ./extra-addons:/mnt/extra-addons
+      - ./filestore:/var/lib/odoo/.local/share/Odoo/filestore/postgres
+      - ./sessions:/var/lib/odoo/.local/share/Odoo/sessions
+      - ./new_requirements.txt:/tmp/new_requirements.txt
+  mydb:
+      image: postgres:16
+      environment:
+        - POSTGRES_USER=<db_user>
+        - POSTGRES_PASSWORD=<db_password>
+        - POSTGRES_DB=<db_name>
+      restart: 
+        always
+      volumes:
+        - ./dump.sql:/docker-entrypoint-initdb.d/dump.sql # Import dump.sql file to the database if it exists
+  nginx:
+    restart: always
+    build: 
+      dockerfile: Dockerfile.dev
+      context: ./nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - odoo
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=$CF_TUNNEL_TOKEN
